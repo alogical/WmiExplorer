@@ -3,6 +3,45 @@ using namespace System.Drawing
 using namespace System.Collections
 using namespace System.Management
 
+$code = @"
+using System;
+using System.Drawing;
+using System.Runtime.InteropServices;
+
+namespace System
+{
+	public class IconExtractor
+	{
+
+	 public static Icon Extract(string file, int number, bool largeIcon)
+	 {
+	  IntPtr large;
+	  IntPtr small;
+	  ExtractIconEx(file, number, out large, out small, 1);
+	  try
+	  {
+	   return Icon.FromHandle(largeIcon ? large : small);
+	  }
+	  catch
+	  {
+	   return null;
+	  }
+
+	 }
+	 [DllImport("Shell32.dll", EntryPoint = "ExtractIconExW", CharSet = CharSet.Unicode, ExactSpelling = true, CallingConvention = CallingConvention.StdCall)]
+	 private static extern int ExtractIconEx(string sFile, int iIndex, out IntPtr piLargeVersion, out IntPtr piSmallVersion, int amountIcons);
+
+	}
+}
+"@
+
+Add-Type -TypeDefinition $code -ReferencedAssemblies System.Drawing
+
+[Automation.Runspaces.Runspace]$runspace = [Automation.Runspaces.RunspaceFactory]::CreateRunspace()
+$runspace.ApartmentState = [System.Threading.ApartmentState]::STA
+
+$gui = [PowerShell]::Create()
+
 class MainForm : Form {
     hidden [WmiClassTreeView] $_classTree
 
@@ -69,6 +108,11 @@ class WmiClassTreeView : TreeView {
     WmiClassTreeView ([Control]$DisplayContainer) : Base() {
         $this.Dock = [DockStyle]::Fill
 
+        $ImageList = [ImageList]::new()
+        $ImageList.Images.Add([System.IconExtractor]::Extract("Shell32.dll", 309, $True))
+        $ImageList.Images.Add([System.IconExtractor]::Extract("Shell32.dll", 90, $True))
+        $this.ImageList = $ImageList
+
         $this.DisplayContainer = $DisplayContainer
     }
 
@@ -122,7 +166,8 @@ class WmiNamespaceTreeNode : TreeNode {
 
         $this.Text = $Namespace.Name
         $this.Name = $Namespace.__NAMESPACE
-        # Set icon...
+        $this.ImageIndex = 0
+        $this.SelectedImageIndex = 0
     }
 
     [Void] Initialize() {
@@ -159,12 +204,22 @@ class WmiClassTreeNode : TreeNode {
 
         $this.Text = $Class.Name
         $this.Name = $Class.__NAMESPACE
-        # Set icon...
+        $this.ImageIndex = 1
+        $this.SelectedImageIndex = 1
     }
 
     [Void] Display ([Control]$Container) {
         $Container.Controls.Clear()
-        $wmi = Get-WmiObject -Namespace $this.Name -Class $this.Text
+
+        $response = Get-WmiObject -Namespace $this.Name -Class $this.Text
+
+        # TODO: Should have a better way of displaying that there are multiple WMI objects returned for the class.
+        if ($response -is [Array]) {
+            $wmi = $response[0]
+        }
+        else {
+            $wmi = $response
+        }
 
         $layout = [SplitContainer]::new()
         $layout.Dock = [DockStyle]::Fill
