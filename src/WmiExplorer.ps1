@@ -166,36 +166,16 @@ class WmiClassTreeNode : TreeNode {
         $Container.Controls.Clear()
         $wmi = Get-WmiObject -Namespace $this.Name -Class $this.Text
 
-        $layout = [TableLayoutPanel]::new()
+        $layout = [SplitContainer]::new()
         $layout.Dock = [DockStyle]::Fill
-        $layout.AutoScroll = $true
-        $layout.RowCount = 2
-        $layout.ColumnCount = 2
+        $layout.Orientation = [Orientation]::Vertical
+        $layout.SplitterWidth = 5
+        $layout.Panel1.BackColor = [Color]::AliceBlue
+        $layout.Panel2.BackColor = [Color]::AliceBlue
+        $layout.Panel1.AutoScroll = $true
+        $layout.Panel2.AutoScroll = $true
+        $layout.Panel1.Controls.Add([WmiClassPropertiesPanel]::new($wmi.Properties))
 
-        $label = [Label]::new()
-        $label.Text = 'Properties'
-        $label.Dock = [DockStyle]::Fill
-        $label.TextAlign = [ContentAlignment]::MiddleCenter
-        $layout.Controls.Add($label, 0, 0)
-
-        $label = [Label]::new()
-        $label.Text ='Methods'
-        $label.Dock = [DockStyle]::Fill
-        $label.TextAlign = [ContentAlignment]::MiddleCenter
-        $layout.Controls.Add($label, 1, 0)
-
-        $row0style = [RowStyle]::new()
-        $row0style.Height = 25
-        $row0style.SizeType = [SizeType]::Absolute
-
-        $row1style = [RowStyle]::new()
-        $row1style.Height = 100
-        $row1style.SizeType = [SizeType]::Percent
-
-        $layout.RowStyles.Add($row0style)
-        $layout.RowStyles.Add($row1style)
-
-        $layout.Controls.Add([WmiClassPropertiesPanel]::new($wmi.Properties), 0, 1)
         $Container.Controls.Add($layout)
     }
 }
@@ -209,9 +189,17 @@ class WmiClassPropertiesPanel : TableLayoutPanel {
         $valueWidth = 0
         
         $txtHeight = $g.MeasureString('W', $this.Font).Height + 1
-        $this.Height = ($this.Margin.Top + $this.Margin.Bottom + $txtHeight) * $Properties.Count
+        $this.Height = ($this.Margin.Top + $this.Margin.Bottom + $txtHeight) * ($Properties.Count + 1)
 
-        $i = 0
+        $label = [Label]::new()
+        $label.BackColor = [Color]::LightGray
+        $label.TextAlign = [ContentAlignment]::MiddleCenter
+        $label.Text = "Properties"
+        $label.Dock = [DockStyle]::Fill
+        $this.Controls.Add($label, 0, 0)
+        $this.SetColumnSpan($label, 2)
+
+        $i = 1
         foreach ($prop in $Properties) {
             # TODO: Properly handle arrays, and possibly nested data structures.
             if ($prop.IsArray) { continue }
@@ -220,6 +208,7 @@ class WmiClassPropertiesPanel : TableLayoutPanel {
             if ($size.Width -gt $labelWidth) { $labelWidth = $size.Width }
 
             $label = [Label]::new()
+            $label.BackColor = [Color]::White
             $label.Text = $prop.Name
             $label.Dock = [DockStyle]::Fill
             $this.Controls.Add($label, 0, $i)
@@ -230,6 +219,7 @@ class WmiClassPropertiesPanel : TableLayoutPanel {
             if ($size.Width -gt $valueWidth) { $valueWidth = $size.Width }
 
             $label = [Label]::new()
+            $label.BackColor = [Color]::White
             $label.Text = $strValue
             $label.Dock = [DockStyle]::Fill
             $this.Controls.Add($label, 1, $i)
@@ -238,7 +228,7 @@ class WmiClassPropertiesPanel : TableLayoutPanel {
         }
         
         $labelColStyle = [ColumnStyle]::new()
-        $labelColStyle.Width = $this.Margin.Left + $this.Margin.Right + $labelWidth
+        $labelColStyle.Width = $this.Margin.Left + $this.Margin.Right + $labelWidth + 4
         $labelColStyle.SizeType = [SizeType]::Absolute
 
         $valueColStyle = [ColumnStyle]::new()
@@ -247,6 +237,8 @@ class WmiClassPropertiesPanel : TableLayoutPanel {
 
         $this.ColumnStyles.Add($labelColStyle)
         $this.ColumnStyles.Add($valueColStyle)
+
+        $this.Width = $this.Margin.Left + $this.Margin.Right + $valueWidth + $labelWidth + 4
     }
 }
 
